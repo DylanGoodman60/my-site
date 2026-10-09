@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dylan Goodman — Software Developer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💻</text></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ---- Gruvbox tokens: dark by default, light on request ---- */
+  :root {
+    --bg: #282828;
+    --bg-soft: #32302f;
+    --bg-alt: #3c3836;
+    --fg: #ebdbb2;
+    --muted: #928374;
+    --red: #fb4934;
+    --green: #b8bb26;
+    --yellow: #fabd2f;
+    --blue: #83a598;
+    --purple: #d3869b;
+    --aqua: #8ec07c;
+    --orange: #fe8019;
+    --border: #504945;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #282828; --bg-soft: #32302f; --bg-alt: #3c3836; --fg: #ebdbb2;
+    --muted: #928374; --red: #fb4934; --green: #b8bb26; --yellow: #fabd2f;
+    --blue: #83a598; --purple: #d3869b; --aqua: #8ec07c; --orange: #fe8019;
+    --border: #504945;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    padding: 3rem 1rem;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  a { color: inherit; }
+
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--aqua);
+    outline-offset: 2px;
+  }
+
+  .term {
+    width: 100%;
+    max-width: 700px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-soft);
+  }
+
+  /* title bar */
+  .title-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.9rem;
+    background: var(--bg-alt);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .dot.red { background: var(--red); }
+  .dot.yellow { background: var(--yellow); }
+  .dot.green { background: var(--green); }
+
+  .title-text {
+    margin: 0 auto;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  /* prompt line */
+  .prompt {
+    padding: 0.9rem 1.1rem 0.3rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .prompt .sym { color: var(--green); }
+
+.cmd {
+  --cmd-len: 16;
+  color: var(--fg);
+  border-right: 2px solid var(--fg);
+  animation: type 1s steps(var(--cmd-len)) 1 both, blink 1s step-end infinite;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  
+  /* Add a tiny fractional buffer to ensure no truncation */
+  width: calc((var(--cmd-len) * 1ch) + 2px); 
+  box-sizing: content-box; /* Ensures padding/border don't eat into text width */
+}
+
+  @keyframes type { from { width: 0; } to { width: calc(var(--cmd-len) * 1ch); } }
+  @keyframes blink { 50% { border-color: transparent; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .prompt .cmd { animation: none; width: calc(var(--cmd-len) * 1ch); border-right-color: transparent; }
+  }
+
+  /* tab / buffer bar */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0.8rem 0.9rem 0;
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    font: inherit;
+    font-size: 0.82rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    padding: 0.4rem 0.2rem;
+    cursor: pointer;
+  }
+
+  .tab:hover { color: var(--fg); }
+
+  .tab[aria-selected="true"] {
+    color: var(--yellow);
+    border-bottom-color: var(--yellow);
+  }
+
+  .tab .num {
+    color: var(--muted);
+    margin-right: 0.35rem;
+    font-size: 0.75rem;
+  }
+
+  /* editor body: wrapper animates height so tab switches don't jump */
+  .panels {
+    position: relative;
+    overflow: hidden;
+    transition: height 0.35s ease;
+  }
+
+  .panel {
+    display: none;
+    padding: 1.1rem 1.1rem 1.4rem;
+    font-size: 0.92rem;
+    line-height: 1.7;
+    counter-reset: line;
+    min-height: 260px;
+  }
+
+  .panel[data-active="true"] { display: block; }
+
+  .panel.entering {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  .panel.entering-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panels { transition: none; }
+    .panel.entering, .panel.entering-active { opacity: 1; transform: none; transition: none; }
+  }
+
+  .line {
+    display: flex;
+    gap: 1rem;
+    counter-increment: line;
+  }
+
+  .line::before {
+    content: counter(line);
+    flex: none;
+    width: 1.6rem;
+    text-align: right;
+    color: var(--muted);
+    opacity: 0.6;
+    user-select: none;
+    padding-top: 0.02em;
+  }
+
+  .line .txt { min-width: 0; }
+
+  .h1 { color: var(--orange); font-weight: 700; }
+  .h2 { color: var(--aqua); font-weight: 700; }
+  .muted-tok { color: var(--muted); }
+  .bullet { color: var(--purple); }
+  .kw { color: var(--blue); }
+
+  .linklike {
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+
+  .line a.linklike:hover,
+  .line button.linklike:hover {
+    border-bottom-color: var(--blue);
+  }
+
+  button.linklike {
+    background: none;
+    border: none;
+    font: inherit;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .copy-tag {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-left: 0.6rem;
+  }
+
+  .copy-tag.copied { color: var(--green); }
+
+  /* status line */
+  .status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4rem 0.9rem;
+    background: var(--bg-alt);
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .status-left { display: flex; align-items: center; gap: 0.6rem; }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: none;
+    border: 1px solid var(--border);
+    display: block;
+  }
+
+  .mode {
+    background: var(--yellow);
+    color: var(--bg);
+    font-weight: 700;
+    padding: 0.1rem 0.5rem;
+    border-radius: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  .status-right { display: flex; gap: 0.9rem; }
+
+  @media (max-width: 420px) {
+    .status-right span:nth-child(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="term">
+  <div class="title-bar">
+    <span class="dot red"></span>
+    <span class="dot yellow"></span>
+    <span class="dot green"></span>
+    <span class="title-text">dylan@goodman: ~/portfolio</span>
+      <img class="avatar" src="data:image/webp;base64,UklGRgQOAABXRUJQVlA4IPgNAABQPQCdASqAAIAAPlUkj0UjoiGYuoeUOAVEsQBeMBNGNlZ2tuodbeXo+F/xvVx+od7j5nfNa9NX9332r0OemBtDrgb+h8FfJR8YkjuH+o182/GmO5li8ssrm/J7bpNanb/b6F//b814vv4qHUCzIqXFhzNAi+k3Eu8td7xx/vjkreld2+TsXFkhDxkxBbMSPgrnOsm/hvQoKY/sXz+1ch8mB07giu33EAVEj9M+8s6hXKiySR/9YgZjzTDJ5vCct/T+HEbbEm5LrAydxLXde6sYBO5CLqlrj4JsjRHeSgx0uKMYX4BGO4nQLKbh9ryF+b5QPy9FdTfnsDrlZcVaS5BkucJHMNfn4SIahdltoN4BejFhQ+oG+aKRoDkJJ0ewDyKwixBydbxPGs674RGxpGr3dJPU38up5UJ3D0u/41qzz0rL3Jiq7V7A4z9w0SEKqsMaGTSoDvYzeyWsIWQFznHmwt9WuwlpaB1G2tAdUEC06NSJd2eKeKFGP8M4Qjn2dhSxEbfcxvS0ZCsyihCmMi39QH6RQEjBb8UkW80//VHrJxRWnsp6nyuDqmHoU62eH8kOBgN25REdSDSqfZMrrdIsDVNWWDaD4Ko6lyTR8bIxkaDDHEwOtSHfW5gWn9eqtSwiSdICjcDZRfurkNcyBO8wdIgwAP7V3+HOumh/Eq0Yuo+IWtljYkapSpFGTeRJRZIZ+aSRaQte1yzMii7JU5JzCB8rqpiI2w+I48RUf4qb/+f/ITv6/8/8Tc7cXdn8HPOmivW9rbIkCkPPzm+awKLt3pRMFjkUDqmYS3TnNenie+FyBiZi4tZmq9HxYRNVbkIFP6Vo5uBqEuQkPePVcmxQeVVJTTfsXcMh/XWuv7A8f81IGoW0J9IJzAmdT6OqauEQbUJqleVXYu2XPQtPWm2Jyf7FVmxdpF79BaQRHi813bTgjiHSEnQnY4qw1T9W/vuzZsf56cfwlpvQOStBNLFPDdfq5jAGTSK0TEav6RzSCBaquZ9GgUnay4oVgfr4YahZQKWRb/s+nXD55hunnMMGiojRQm+Jh6+Kb5EHgLbVE+upBrjaW5V390sg0XxtKicfkW3L6tRvuMBDID7fRoXZ4g5ruOjCd/K3vD8Sirm7vwEuYo8pdrig35ad94K+O2ESMcevz9Wnx98+ZBhw7JQaQEjLiF+lqbTAxFVTxGBTGBYcDll5hvn5V4AQfCvmeD01DynF12YgDNQu5NIKhuRspVUnH3WTg46menZPZQtQJHJT/AEB5U+qTwBFUKbXNXfKLTubejcR37VN6W8KM1ZEdYV0sJltl55S5dD1rfZi0NCskq+RbtPUl32e4fTIEgpoulEPSA5DopWnV1s9LQ4pDSik5biBfzmA/z1IyWgc2NOL0AqDxmOOr+ngvNzx7nO07chX1PohZJcjyF8C1GUBHVYs1x+uKIxiO8AmjkhCwo6/jUyzjzRMV8uGO7pVk65Ww9rOFR37dmJ1sK1ZDwBseWNT5a44foGXBc7MPadcH0BM++FVxpk6xF+hKcGcinjThD8dLWfGt5j9Pt3UHQk52HbXLXub3ir0JW0wTT/Q+gm4rmLUKm9bncTylFW80O5G84DvnwqXyDVueFapHp0DAsEckp7yjFwJT41ASqqDowicgoNcASGHA0N/0HCcbUn0XuyebFkmbDp5IR+r34DNjGWj+JKmiikCX4zsrlzialC9PdwS5NFmjLp0r4dASPzeyhCFAqIXb5ZBOn9qOHWnTstAtQ9q9fyjMVSi9ia8vAN5MUKtzdbHlzAY7dFAzQPf9yeGziYhO4D4+DYeVuq26kCzhJylEvYqwXpYFL4n4SYcIAQHupDfasM+PVZCXNSvU4xvv9a87fJi5xV9oEcU97qfTYCn6VDD3HxaBbX/NaNKqe6eGxabtJwHPxIm1UEmDttq1h8jjMRNxND756HD5WZeGnKogu2YM0yv61/7H/i+Zbke9jt1gBILaiK7vbhKaCGGyg9ORmu9D+e0vrPaiGlfstrQuuKFMFXkXaLKjBYZmEVAzGuJmCfUWupVEzz9MNT6A3XMF2fXDLjuach6Hk2jH43hZRbFP3k27EIQf4rCMz/2zCCJo0E45VhC3mZ+XUU3MCrWomoii8xJZNgxPauOA04b+D4QUfJ5q6XGynDuPF5I0Y2S8+jDnDDEdDsEEJbitJOqdazc5tVA/xR13j9wtcxqVtpdLYazWqcJIxKaJT7bZeRUCrB6MZWeVx7BAvRC+JydjAVlMUaR08XoJ1CvruwxedULvDUzKLMX2A776pXdLjzkzgmHmptpIApT6cygIAvg54uV8gvIol56otyiGoUt6UCoWZwNZk22g2chisqxcqblebNbHimWZ6Y/hDClpSGmxEPHkq5dFcQK7GGtsr6W+MtpGRSPzHYVdDh9i6tBiwrZDz8DyOMWJX2FjytipqDWUTJEIHqv5Coh45sb0yCzHat5kQCMmAmlSciXzExcBXVadVnCa51F4wDxg0UqMi6lnFB3N5B330/NKhqzbDtdsv365VKzDSrYYvSqw9Ube5YuQWySRJ3u83G1+bNhcP5nNl7yyB/J5PKirloHLjJgF3v/Nw3fkb6RN39pyaAm7Ne45HkmWTNQaqo1eFgrhLOuiUXHn/YW2vK4vH1jiC07L5F7whcAaEkrylHrhwLY7iq1qkDP0GmDAt7nD4oWk7rZ9bASif9MJe9Pyq4ABFvoDXRWDF5Hq9LilUnwiSFpxMCJkMonvROdGs5W5tMqUFSiw86fw6kQ28DGaJWUMPNKhjBerzjXYWKOFgLXCOuPNlujp91FrqMAXhgJggAnpLYROhmr+Aug852Jksx8f7DVGJEg+1yi9FpsnT0anJIv6kmzfwPeF103AA9MVw4WRjOR0qTVOphcEqvDUy7Qii3b65HUWau4+iL6r2Sc1/2iBTOQaCSHfy1M2vupksPxrsFX7t2398eGujxkrW8xtzYHPrVFN5rc4xxAC3J5f/ZkxOcl3eZFgCpZZmKJiBoGaNgixQc+v61r7yUtwe6L79imtJpbz4TTfLu7GXrY0E8Mms+aJpTtQ7SGmNpu57dGxhfE4pVbDw/fslh2XQa7DvruCfaugYEfoWOSo0Imw3ZnKbmR+JrvWwMhlG2a8H3U86V3iaBDXihIVJEJP/fmbfeksdqPYMfMQYgnoWnRiFmWoyLW9VC6ukQapl5My6XT+pb+OSq/D5X0W22nMTjmPecNwcTCYagaSeHert+olaqcPUHyrsOjz5pcbJtHfixM97HZXIh0uxJK0eYR8XtSSZ4VpdVig5A5ij8B9NAbDRU+tASsbJKIAJ38RsOt5O0nEartu5rhjVnuE3md8gyKld2fV5AHINmBJ9xIFK9aCaHBPJUhsVc5FtMYLnG6zRcDaMBbURT/peZysEhk0qn1jmbRlfK2W4bH9o9eDzFn0RSM5cB5vXOBke/EPNc9gu6k/baW4QCATmUWX2jROJ8QRWfJYCkZvSzuVxNk8zKFPxHn2OfKNfWfy8nPhE6zdxWPqwn7m1FJdFgnxEGaeWlrDR5b+dQ2N/3oPbgs+ezwoUtQRizncBy8N5acTkTHFtfMAplL2IIcdWD+K4+TfVAtCYCkiDxm7AnjWn7/CuOaMw6jmTNbClzTMyF3R9ZL6OrsJglrK7mqirNlsmvtO+pWWVUwn9QnghNFXrgEus9AZptAjDKNhZ4S9AIgoybXgSzGJ7XXeQgSi25yrw+vKKsS3i0aAeoeP4e4it7gAGabjwPdKBORG9zA8+9BvmK7XiLs5lkdYFVIVXg3ws6QhdurfcyAAznKmS+TaOv/vqnhLuSwUTtfNPmDZ2huFwkhGbw5zq2+uk3Dnf9Fs73o3SjDCEsLB+pm9NzGQOJ07LMHTnDrJ7mHvpF/wdzrRHl8AbfH6L8p81BEYK8Sa13GFjl5h4EJ4MDqc4k7tk/NAFd+DgGARs1fTPMUjvFj+Uehs3TfyazChokFMi7FSwqn9J0+p8Ew1d9iFrZcvc00jUU5G1dR3csB2QGAM7tQHrTtqafx6bZjAPlTb2+Gx+qo+lLUCoI3WyFx75wbHpiq/zwTAnfUiJCch6nixn9h1443w/d+cg5IBq8Q09e+ZFJw2Xs7THgQVs7dnh5r+VCFR8867aDr1kSCR08B86CUzGU2yOrPmn8iLRiOCHfPaarU/q8d24WGvq2L7i/vwIacC3FITf/jrJ27zD21JzyKJqUmuakTP+W+5heC7ki6QYdtAzz4iUNDZE97KWSxEXkjvTN6wnutvHcXSTM0LpCZyUpXLepb2to1JEBQv1SRsMkf9gsAITP5HL2YYqy/sltvvUbxJUtpMc0EhdL+CkMRXuFDaMUpFWT5ZuFU0IBa0vBL0DWQUKh8fWwg9SUaFrNgGklbQ6pCwj/BbBUkMRkkrIQPzx1jbTuH5id/PwBGMx7t9GF6hnC05qSOT1AKD06cJoP7EBUb3MuNdtujMkEbPDMlRWB2YnH8e0+K4nFfyrIwc3PjVKpvawJbttu2fvJ8fpPPQSiX8Orv9t6IXCO2yWpE97sdRBl/Of8dimaap7Rswi1NifLBLy2XiRhOJHQqJjNng5nIsNl7lTCLvCwNPX7reXAAANtzpDrR28VID0eEsHitFtfvsytbJfppO6B6PMiooothd9ULRZNL1CzXYAGScvgMoTQngSaXRPb9c17RyvCdEXF2zc7kwchIXqVfFrvu4SevUl/0fAPejpbspZV7xyQrSE0D/pHcQWzzJIvZtUPfMd/7AAA=" alt="Dylan Goodman" width="24" height="24">
+  </div>
+
+  <div class="prompt">
+    <span class="sym">$</span> <span class="cmd" id="cmdText">vim portfolio.md</span>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Buffers">
+    <button class="tab" role="tab" aria-selected="true" data-tab="about"><span class="num">1</span>about.md</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="work"><span class="num">2</span>work.md</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="projects"><span class="num">3</span>projects.md</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="contact"><span class="num">4</span>contact.md</button>
+  </div>
+
+  <div class="panels" id="panelsWrap">
+
+    <!-- ABOUT -->
+    <div class="panel" data-panel="about" data-active="true">
+      <div class="line"><span class="txt h1"># Dylan Goodman</span></div>
+      <div class="line"><span class="txt"></span></div>
+      <!-- EDIT: your one-line summary -->
+      <div class="line"><span class="txt">Hi! I'm a software developer based in Toronto, Canada.</span></div>
+      <div class="line"><span class="txt"></span></div>
+      <!-- EDIT: your bio, 1-2 short lines -->
+      <!-- <div class="line"><span class="txt">text editor, usually this one.</span></div> -->
+      <div class="line"><span class="txt h2">## Currently</span></div>
+      <!-- EDIT: swap these for what's actually true right now -->
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="kw"> Work:</span> Data & AI Application Developer at CIBC</span></div>
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="kw">My stack:</span> React, Python, PostgreSQL || SQLite</span></div>
+    </div>
+
+    <!-- WORK -->
+    <div class="panel" data-panel="work" data-active="false">
+      <div class="line"><span class="txt h1"># Work</span></div>
+      <div class="line"><span class="txt"></span></div>
+      <!-- EDIT: pulled from your resume — adjust wording, links, or stack anytime -->
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="muted-tok">2025–Present</span> <span class="kw">CIBC</span>: Python, SQL, Azure</span></div>
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="muted-tok">2024–2025</span> <span class="kw">Full Port Development</span>: SvelteKit, FastAPI, MongoDB, LangChain </span></div>
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="muted-tok">2023</span> <span class="kw">SAP</span>: Jenkins, Python, Bash</span></div>
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="muted-tok">2022</span> <span class="kw">University of Guelph</span>: Python, OpenCV (research)</span></div>
+    </div>
+
+    <!-- PROJECTS -->
+    <div class="panel" data-panel="projects" data-active="false">
+      <div class="line"><span class="txt h1"># Projects</span></div>
+      <div class="line"><span class="txt"></span></div>
+      <div class="line"><span class="txt h2">## Bike Share Bounty</span></div>
+      <!-- EDIT: add a one-line description of the project -->
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="kw">Live:</span> <a class="linklike" href="https://bike.dylangoodman.ca" target="_blank" rel="noopener">bike.dylangoodman.ca</a></span></div>
+    </div>
+
+    <!-- CONTACTS -->
+    <div class="panel" data-panel="contact" data-active="false">
+      <div class="line"><span class="txt h1"># Contact</span></div>
+      <div class="line"><span class="txt"></span></div>
+      <!-- EDIT: your real email -->
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="kw">Email:</span> <button class="linklike" onclick="copyEmail(this)" data-email="dylan.goodman60@gmail.com">dylan.goodman60@gmail.com</button><span class="copy-tag"># click to copy</span></span></div>
+      <!-- EDIT: your real LinkedIn URL -->
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="kw">LinkedIn:</span> <a class="linklike" href="https://linkedin.com/in/dylan-jr-goodman" target="_blank" rel="noopener">linkedin.com/in/dylan-jr-goodman</a></span></div>
+      <!-- EDIT: your real GitHub URL -->
+      <div class="line"><span class="txt"><span class="bullet">-</span> <span class="kw">GitHub:</span> <a class="linklike" href="https://github.com/dylangoodman60" target="_blank" rel="noopener">github.com/dylangoodman60</a></span></div>
+    </div>
+
+  </div>
+
+  <div class="status">
+    <div class="status-left">
+      <span class="mode">NORMAL</span>
+      <span class="statusfile">about.md</span>
+    </div>
+    <div class="status-right">
+      <span>markdown</span>
+      <span>utf-8[unix]</span>
+      <span class="statusruler">1,1&nbsp;&nbsp;Top</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  var tabs = document.querySelectorAll('.tab');
+  var panels = document.querySelectorAll('.panel');
+  var panelsWrap = document.getElementById('panelsWrap');
+  var statusFile = document.querySelector('.statusfile');
+  var statusRuler = document.querySelector('.statusruler');
+  var cmdEl = document.getElementById('cmdText');
+
+  // Keep the typing animation width in sync with whatever command text is here,
+  // so editing it later doesn't clip the last few characters.
+  if (cmdEl) {
+    cmdEl.style.setProperty('--cmd-len', cmdEl.textContent.length);
+  }
+
+  function activate(name) {
+    var current = document.querySelector('.panel[data-active="true"]');
+    var next = document.querySelector('.panel[data-panel="' + name + '"]');
+    if (!next || next === current) return;
+
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-tab') === name;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+
+    // Lock the wrapper at its current pixel height, then animate to the new one.
+    var startHeight = panelsWrap.offsetHeight;
+    panelsWrap.style.height = startHeight + 'px';
+
+    panels.forEach(function (p) {
+      p.setAttribute('data-active', p === next ? 'true' : 'false');
+    });
+
+    var endHeight = next.scrollHeight;
+    next.classList.add('entering');
+
+    requestAnimationFrame(function () {
+      panelsWrap.style.height = endHeight + 'px';
+      requestAnimationFrame(function () {
+        next.classList.add('entering-active');
+      });
+    });
+
+    var done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      panelsWrap.style.height = 'auto';
+      next.classList.remove('entering', 'entering-active');
+      panelsWrap.removeEventListener('transitionend', onEnd);
+    }
+    function onEnd(e) {
+      if (e.target === panelsWrap && e.propertyName === 'height') finish();
+    }
+    panelsWrap.addEventListener('transitionend', onEnd);
+    setTimeout(finish, 450);
+
+    statusFile.textContent = name + '.md';
+    statusRuler.innerHTML = '1,1&nbsp;&nbsp;Top';
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      activate(t.getAttribute('data-tab'));
+    });
+  });
+
+  var order = ['about', 'work', 'projects', 'contact'];
+  document.addEventListener('keydown', function (e) {
+    if (e.key >= '1' && e.key <= '4') {
+      activate(order[Number(e.key) - 1]);
+    }
+  });
+
+  function copyEmail(btn) {
+    var email = btn.getAttribute('data-email');
+    var tag = btn.parentElement.querySelector('.copy-tag');
+    navigator.clipboard.writeText(email).then(function () {
+      tag.textContent = '# copied!';
+      tag.classList.add('copied');
+      setTimeout(function () {
+        tag.textContent = '# click to copy';
+        tag.classList.remove('copied');
+      }, 1600);
+    });
+  }
+</script>
+
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4811abbdb55f80e',t:'MTc5MTU4NzkwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"bb65b3af3fee4b2c9527ad7d873e9df7","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
+
